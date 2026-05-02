@@ -16,8 +16,7 @@
 │   └── src/
 │       ├── lib.rs                  # 库模块（导出 server）
 │       ├── main.rs                 # 主入口（多线程启动 eBPF + 服务器）
-│       ├── server.rs               # Salvo 代理服务器模块
-│       └── server_bin.rs           # 独立服务器二进制
+│       └── server.rs               # Salvo 代理服务器模块
 │
 ├── gh_proxy-ebpf/                  # eBPF TC 程序
 │   ├── Cargo.toml                  # eBPF 依赖
@@ -33,10 +32,9 @@
 
 ## 二进制文件
 
-编译后会生成两个二进制文件：
+编译后生成一个二进制文件：
 
-1. **gh_proxy** - 主程序（多线程：eBPF + 服务器）
-2. **gh_proxy-server** - 独立服务器（仅 Salvo）
+- **gh_proxy** - 主程序（多线程：eBPF + 服务器）
 
 ## 使用方法
 
@@ -55,11 +53,8 @@ cd /data/data/com.termux/files/home/0proxy
 # 编译
 cargo build --release -p gh_proxy
 
-# 运行主程序（多线程）
+# 运行
 sudo ./target/release/gh_proxy --iface wlan0 --port 443
-
-# 或者只运行服务器
-sudo ./target/release/gh_proxy-server --port 443
 ```
 
 ### 方式 3: 使用 Cargo 运行
@@ -67,11 +62,7 @@ sudo ./target/release/gh_proxy-server --port 443
 ```bash
 cd /data/data/com.termux/files/home/0proxy
 
-# 运行主程序
 sudo cargo run --release -p gh_proxy -- --iface wlan0 --port 443
-
-# 或者只运行服务器
-sudo cargo run --release -p gh_proxy --bin gh_proxy-server -- --port 443
 ```
 
 ## 工作原理

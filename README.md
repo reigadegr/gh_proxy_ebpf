@@ -6,7 +6,6 @@
 
 - **纯 eBPF 方案**：无需 iptables，直接使用 eBPF TC 修改数据包
 - **多线程架构**：eBPF 拦截 + Salvo 服务器并行运行
-- **模块化设计**：主程序和独立服务器可分别使用
 
 ## 项目结构
 
@@ -25,8 +24,7 @@
 │   └── src/
 │       ├── lib.rs                  # 库模块（导出 server）
 │       ├── main.rs                 # 主入口（多线程启动 eBPF + 服务器）
-│       ├── server.rs               # Salvo 代理服务器模块
-│       └── server_bin.rs           # 独立服务器二进制
+│       └── server.rs               # Salvo 代理服务器模块
 │
 ├── gh_proxy-ebpf/                  # eBPF TC 程序
 │   ├── Cargo.toml
@@ -70,9 +68,6 @@ sudo ./start.sh
 # 方式 2: 手动编译和运行
 cargo build --release -p gh_proxy
 sudo ./target/release/gh_proxy --iface wlan0 --port 443
-
-# 方式 3: 只运行服务器（不使用 eBPF）
-sudo ./target/release/gh_proxy-server --port 443
 ```
 
 ### 测试

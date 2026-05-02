@@ -48,11 +48,10 @@ cargo +nightly ndk --platform "$PLATFORM" -t "$ABI" build --target "$TARGET"
 
 BIN_DIR="$SCRIPT_DIR/target/$TARGET/debug"
 
-if [ ! -x "$BIN_DIR/gh_proxy" ] || [ ! -x "$BIN_DIR/gh_proxy-server" ]; then
+if [ ! -x "$BIN_DIR/gh_proxy" ]; then
     echo "编译完成但未找到预期产物: $BIN_DIR" >&2
     exit 1
 fi
 
 echo "编译完成:"
 echo "  $BIN_DIR/gh_proxy"
-echo "  $BIN_DIR/gh_proxy-server"
