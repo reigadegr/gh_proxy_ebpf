@@ -1,10 +1,6 @@
 [workspace]
 resolver = "3"
-members = [
-    "gh_proxy",
-    "gh_proxy-ebpf",
-    "gh_proxy-common",
-]
+members = ["gh_proxy", "gh_proxy-ebpf", "gh_proxy-common"]
 default-members = ["gh_proxy"]
 
 [workspace.package]
@@ -46,13 +42,13 @@ tokio = { version = "1.40", features = ["full"] }
 
 # Salvo 服务器
 salvo = { version = "0.92.2", features = [
-    "timeout",
-    "concurrency-limiter",
-    "http2-cleartext",
-    "logging",
-    "oapi",
-    "rustls",
-    "proxy",
+  "timeout",
+  "concurrency-limiter",
+  "http2-cleartext",
+  "logging",
+  "oapi",
+  "rustls",
+  "proxy",
 ] }
 
 # 其他

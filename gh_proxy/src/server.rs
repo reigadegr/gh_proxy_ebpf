@@ -1,6 +1,5 @@
 use log::info;
 use mimalloc::MiMalloc;
-use obfstr::obfbytes;
 use salvo::conn::rustls::{Keycert, RustlsConfig};
 use salvo::prelude::*;
 
@@ -17,11 +16,9 @@ async fn redirect_to_gh_proxy(req: &mut Request, res: &mut Response) {
 }
 
 pub async fn run_server(port: u16) -> anyhow::Result<()> {
-    let _ = env_logger::try_init();
-
     // 加载 TLS 证书
-    let private_key = obfbytes!(include_bytes!("../../keys/private_key.pem"));
-    let public_key = obfbytes!(include_bytes!("../../keys/cert.pem"));
+    let private_key = include_bytes!("../../keys/private_key.pem");
+    let public_key = include_bytes!("../../keys/cert.pem");
 
     let tls_config = RustlsConfig::new(Keycert::new().cert(public_key).key(private_key));
 

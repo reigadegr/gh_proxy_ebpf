@@ -6,8 +6,9 @@ use aya_ebpf::{bindings::TC_ACT_OK, macros::classifier, programs::TcContext};
 use core::mem;
 
 /// GitHub.com 的 IP 地址范围（需要根据实际情况更新）
-const GITHUB_IPS: [(u32, u32); 3] = [
+const GITHUB_IPS: [(u32, u32); 4] = [
     (0x141C7000, 0xFFFFFF00), // 20.28.112.0/24
+    (0x14CDF300, 0xFFFFFF00), // 20.205.243.0/24
     (0x8C520000, 0xFFFFF000), // 140.82.112.0/20
     (0xC01EFC00, 0xFFFFFC00), // 192.30.252.0/22
 ];
@@ -169,16 +170,36 @@ fn calculate_checksum(data: *const u8, len: usize) -> u16 {
     // BPF 验证器要求有界循环，IP 头最多 15 个 16-bit word
     let words = len / 2;
     unsafe {
-        if words > 0 { sum += u16::from_be(*(data as *const u16).add(0)) as u32; }
-        if words > 1 { sum += u16::from_be(*(data as *const u16).add(1)) as u32; }
-        if words > 2 { sum += u16::from_be(*(data as *const u16).add(2)) as u32; }
-        if words > 3 { sum += u16::from_be(*(data as *const u16).add(3)) as u32; }
-        if words > 4 { sum += u16::from_be(*(data as *const u16).add(4)) as u32; }
-        if words > 5 { sum += u16::from_be(*(data as *const u16).add(5)) as u32; }
-        if words > 6 { sum += u16::from_be(*(data as *const u16).add(6)) as u32; }
-        if words > 7 { sum += u16::from_be(*(data as *const u16).add(7)) as u32; }
-        if words > 8 { sum += u16::from_be(*(data as *const u16).add(8)) as u32; }
-        if words > 9 { sum += u16::from_be(*(data as *const u16).add(9)) as u32; }
+        if words > 0 {
+            sum += u16::from_be(*(data as *const u16).add(0)) as u32;
+        }
+        if words > 1 {
+            sum += u16::from_be(*(data as *const u16).add(1)) as u32;
+        }
+        if words > 2 {
+            sum += u16::from_be(*(data as *const u16).add(2)) as u32;
+        }
+        if words > 3 {
+            sum += u16::from_be(*(data as *const u16).add(3)) as u32;
+        }
+        if words > 4 {
+            sum += u16::from_be(*(data as *const u16).add(4)) as u32;
+        }
+        if words > 5 {
+            sum += u16::from_be(*(data as *const u16).add(5)) as u32;
+        }
+        if words > 6 {
+            sum += u16::from_be(*(data as *const u16).add(6)) as u32;
+        }
+        if words > 7 {
+            sum += u16::from_be(*(data as *const u16).add(7)) as u32;
+        }
+        if words > 8 {
+            sum += u16::from_be(*(data as *const u16).add(8)) as u32;
+        }
+        if words > 9 {
+            sum += u16::from_be(*(data as *const u16).add(9)) as u32;
+        }
     }
 
     // 折叠进位（最多需要 2 次）

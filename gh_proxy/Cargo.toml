@@ -18,27 +18,32 @@ gh_proxy-common = { path = "../gh_proxy-common", features = ["user"] }
 # 通用依赖
 anyhow = "1"
 clap = { version = "4.5", features = ["derive"] }
-env_logger = "0.11"
 log = "0.4"
 tokio = { version = "1.40", features = ["full"] }
 
 # Salvo 服务器
 salvo = { version = "0.92.2", features = [
-    "timeout",
-    "concurrency-limiter",
-    "http2-cleartext",
-    "logging",
-    "oapi",
-    "rustls",
-    "proxy",
+  "timeout",
+  "concurrency-limiter",
+  "http2-cleartext",
+  "logging",
+  "oapi",
+  "rustls",
+  "proxy",
 ] }
 
 # 其他
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 chrono = "0.4"
-mimalloc = { version = "0.1", features = ["v2", "no_thp", "override"] }
-obfstr = "0.4"
+mimalloc = { version = "0.1.50", features = ["v2", "no_thp", "override"] }
+
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = [
+  "local-time",
+  "env-filter",
+] }
+
 
 [features]
 default = ["user"]
