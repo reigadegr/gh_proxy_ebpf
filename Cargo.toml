@@ -1,4 +1,5 @@
 [workspace]
+resolver = "3"
 members = [
     "gh_proxy",
     "gh_proxy-ebpf",
@@ -30,7 +31,7 @@ struct_excessive_bools = "allow"
 
 [workspace.dependencies]
 # eBPF 相关
-aya = { git = "https://github.com/aya-rs/aya", features = ["async_tokio"] }
+aya = { git = "https://github.com/aya-rs/aya" }
 aya-build = { git = "https://github.com/aya-rs/aya" }
 aya-ebpf = { git = "https://github.com/aya-rs/aya" }
 aya-log = { git = "https://github.com/aya-rs/aya" }

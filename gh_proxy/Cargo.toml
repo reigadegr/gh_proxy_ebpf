@@ -16,7 +16,7 @@ workspace = true
 
 [dependencies]
 # eBPF 相关
-aya = { git = "https://github.com/aya-rs/aya", features = ["async_tokio"] }
+aya = { git = "https://github.com/aya-rs/aya" }
 aya-log = { git = "https://github.com/aya-rs/aya" }
 gh_proxy-common = { path = "../gh_proxy-common", features = ["user"] }
 
@@ -48,3 +48,6 @@ obfstr = "0.4"
 [features]
 default = ["user"]
 user = []
+
+[build-dependencies]
+aya-build = { git = "https://github.com/aya-rs/aya" }

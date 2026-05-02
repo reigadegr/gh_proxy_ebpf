@@ -1,24 +1,11 @@
-use std::{fmt, io::IsTerminal};
-
-use chrono::Local;
+use log::info;
 use mimalloc::MiMalloc;
 use obfstr::obfbytes;
+use salvo::conn::rustls::{Keycert, RustlsConfig};
 use salvo::prelude::*;
-use tracing_subscriber::{
-    EnvFilter,
-    fmt::{format::Writer, time::FormatTime},
-};
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
-
-struct LoggerFormatter;
-
-impl FormatTime for LoggerFormatter {
-    fn format_time(&self, w: &mut Writer<'_>) -> fmt::Result {
-        write!(w, "{}", Local::now().format("%Y-%m-%d %H:%M:%S"))
-    }
-}
 
 #[handler]
 async fn redirect_to_gh_proxy(req: &mut Request, res: &mut Response) {
@@ -30,26 +17,16 @@ async fn redirect_to_gh_proxy(req: &mut Request, res: &mut Response) {
 }
 
 pub async fn run_server(port: u16) -> anyhow::Result<()> {
-    // 初始化日志
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("debug"));
-
-    let is_terminal = std::io::stdout().is_terminal();
-
-    tracing_subscriber::fmt()
-        .with_env_filter(env_filter)
-        .with_timer(LoggerFormatter)
-        .with_ansi(is_terminal)
-        .init();
+    let _ = env_logger::try_init();
 
     // 加载 TLS 证书
-    let private_key = obfbytes!(include_bytes!("../../../keys/private_key.pem"));
-    let public_key = obfbytes!(include_bytes!("../../../keys/cert.pem"));
+    let private_key = obfbytes!(include_bytes!("../../keys/private_key.pem"));
+    let public_key = obfbytes!(include_bytes!("../../keys/cert.pem"));
 
     let tls_config = RustlsConfig::new(Keycert::new().cert(public_key).key(private_key));
 
     // 创建路由
     let router = Router::new()
-        .host("github.com")
         .push(
             Router::with_path("/{user}/{repo}/releases/download/{**rest}")
                 .goal(redirect_to_gh_proxy),

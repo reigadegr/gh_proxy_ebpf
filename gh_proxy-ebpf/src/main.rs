@@ -1,11 +1,7 @@
 #![no_std]
 #![no_main]
 
-use aya_ebpf::{
-    bindings::{TC_ACT_OK, TC_ACT_REDIRECT, TC_ACT_SHOT},
-    macros::classifier,
-    programs::TcContext,
-};
+use aya_ebpf::{bindings::TC_ACT_OK, macros::classifier, programs::TcContext};
 use aya_log_ebpf::info;
 
 use core::mem;
@@ -79,43 +75,45 @@ pub fn gh_proxy_ingress(ctx: TcContext) -> i32 {
 fn try_egress(ctx: &TcContext) -> Result<i32, i64> {
     let eth = unsafe { ptr_at_mut::<EthHdr>(ctx, 0)? };
 
-    if u16::from_be(eth.ethertype) != 0x0800 {
+    if u16::from_be(unsafe { (*eth).ethertype }) != 0x0800 {
         return Ok(TC_ACT_OK);
     }
 
     let ipv4 = unsafe { ptr_at_mut::<Ipv4Hdr>(ctx, mem::size_of::<EthHdr>())? };
 
-    if ipv4.protocol != 6 {
+    if unsafe { (*ipv4).protocol } != 6 {
         return Ok(TC_ACT_OK);
     }
 
-    let tcp = unsafe {
-        ptr_at_mut::<TcpHdr>(ctx, mem::size_of::<EthHdr>() + mem::size_of::<Ipv4Hdr>())?
-    };
+    let tcp =
+        unsafe { ptr_at_mut::<TcpHdr>(ctx, mem::size_of::<EthHdr>() + mem::size_of::<Ipv4Hdr>())? };
 
-    let dst_ip = u32::from_be(ipv4.daddr);
-    let dst_port = u16::from_be(tcp.dest);
+    let dst_ip = u32::from_be(unsafe { (*ipv4).daddr });
+    let dst_port = u16::from_be(unsafe { (*tcp).dest });
 
     // 只处理目标是 GitHub 的 TCP 443 流量
     if dst_port == 443 && is_github_ip(dst_ip) {
         info!(
             ctx,
-            "Egress: GitHub {}:{} -> 127.0.0.1:{}",
-            dst_ip,
-            dst_port,
-            LOCAL_PORT
+            "Egress: GitHub {}:{} -> 127.0.0.1:{}", dst_ip, dst_port, LOCAL_PORT
         );
 
         // 修改目标 IP 和端口
-        ipv4.daddr = u32::to_be(LOCAL_IP);
-        tcp.dest = u16::to_be(LOCAL_PORT);
+        unsafe {
+            (*ipv4).daddr = u32::to_be(LOCAL_IP);
+            (*tcp).dest = u16::to_be(LOCAL_PORT);
+        }
 
         // 重新计算 IP 校验和
-        ipv4.check = 0;
-        ipv4.check = calculate_checksum(ipv4 as *const _ as *const u8, 20);
+        unsafe {
+            (*ipv4).check = 0;
+            (*ipv4).check = calculate_checksum(ipv4 as *const _ as *const u8, 20);
+        }
 
         // TCP 校验和需要重新计算（简化处理，设为 0）
-        tcp.check = 0;
+        unsafe {
+            (*tcp).check = 0;
+        }
     }
 
     Ok(TC_ACT_OK)
@@ -124,22 +122,21 @@ fn try_egress(ctx: &TcContext) -> Result<i32, i64> {
 fn try_ingress(ctx: &TcContext) -> Result<i32, i64> {
     let eth = unsafe { ptr_at_mut::<EthHdr>(ctx, 0)? };
 
-    if u16::from_be(eth.ethertype) != 0x0800 {
+    if u16::from_be(unsafe { (*eth).ethertype }) != 0x0800 {
         return Ok(TC_ACT_OK);
     }
 
     let ipv4 = unsafe { ptr_at_mut::<Ipv4Hdr>(ctx, mem::size_of::<EthHdr>())? };
 
-    if ipv4.protocol != 6 {
+    if unsafe { (*ipv4).protocol } != 6 {
         return Ok(TC_ACT_OK);
     }
 
-    let tcp = unsafe {
-        ptr_at_mut::<TcpHdr>(ctx, mem::size_of::<EthHdr>() + mem::size_of::<Ipv4Hdr>())?
-    };
+    let tcp =
+        unsafe { ptr_at_mut::<TcpHdr>(ctx, mem::size_of::<EthHdr>() + mem::size_of::<Ipv4Hdr>())? };
 
-    let src_ip = u32::from_be(ipv4.saddr);
-    let src_port = u16::from_be(tcp.source);
+    let src_ip = u32::from_be(unsafe { (*ipv4).saddr });
+    let src_port = u16::from_be(unsafe { (*tcp).source });
 
     // 来自本地代理的响应
     if src_ip == LOCAL_IP && src_port == LOCAL_PORT {
@@ -185,7 +182,7 @@ fn calculate_checksum(data: *const u8, len: usize) -> u16 {
         }
 
         if len % 2 == 1 {
-            let byte = *((data.add(len - 1)));
+            let byte = *(data.add(len - 1));
             sum += (byte as u32) << 8;
         }
     }
