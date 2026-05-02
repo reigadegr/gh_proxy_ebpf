@@ -1,0 +1,16 @@
+[package]
+name = "gh_proxy-ebpf"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+aya-ebpf = { git = "https://github.com/aya-rs/aya" }
+aya-log-ebpf = { git = "https://github.com/aya-rs/aya" }
+gh_proxy-common = { path = "../gh_proxy-common" }
+
+[[bin]]
+name = "gh_proxy"
+path = "src/main.rs"
+
+[build-dependencies]
+aya-build = { git = "https://github.com/aya-rs/aya" }
