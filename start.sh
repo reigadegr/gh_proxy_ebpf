@@ -5,23 +5,7 @@ SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 TARGET="${RUST_TARGET:-aarch64-linux-android}"
 PORT="${PORT:-443}"
 BIN="$SCRIPT_DIR/target/$TARGET/debug/gh_proxy-server"
-HOSTS_FILE="${HOSTS_FILE:-/system/etc/hosts}"
 CA_CERT="$SCRIPT_DIR/keys/ca.pem"
-
-DOMAINS="
-github.com
-www.github.com
-gist.github.com
-api.github.com
-codeload.github.com
-raw.githubusercontent.com
-objects.githubusercontent.com
-github-releases.githubusercontent.com
-"
-
-MARK_BEGIN="# BEGIN 0PROXY"
-MARK_END="# END 0PROXY"
-HOSTS_BACKUP=""
 SERVER_PID=""
 
 need_root() {
@@ -31,21 +15,9 @@ need_root() {
     fi
 }
 
-need_cmd() {
-    if ! command -v "$1" >/dev/null 2>&1; then
-        echo "缺少命令: $1" >&2
-        exit 1
-    fi
-}
-
 remount_system_rw() {
     mount -o rw,remount /system >/dev/null 2>&1 || true
     mount -o rw,remount / >/dev/null 2>&1 || true
-}
-
-remount_system_ro() {
-    mount -o ro,remount /system >/dev/null 2>&1 || true
-    mount -o ro,remount / >/dev/null 2>&1 || true
 }
 
 ensure_binary() {
@@ -110,79 +82,24 @@ configure_git() {
     git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
 }
 
-backup_hosts() {
-    if [ ! -f "$HOSTS_FILE" ]; then
-        HOSTS_FILE="/etc/hosts"
-    fi
-
-    if [ ! -f "$HOSTS_FILE" ]; then
-        echo "未找到 hosts 文件" >&2
-        exit 1
-    fi
-
-    HOSTS_BACKUP="$SCRIPT_DIR/.hosts.0proxy.bak"
-    cp "$HOSTS_FILE" "$HOSTS_BACKUP"
-}
-
-apply_hosts() {
-    TMP_HOSTS="$SCRIPT_DIR/.hosts.0proxy.tmp"
-
-    sed "/$MARK_BEGIN/,/$MARK_END/d" "$HOSTS_FILE" > "$TMP_HOSTS"
-    {
-        echo "$MARK_BEGIN"
-        for domain in $DOMAINS; do
-            echo "127.0.0.1 $domain"
-        done
-        echo "$MARK_END"
-    } >> "$TMP_HOSTS"
-
-    remount_system_rw
-    if ! cp "$TMP_HOSTS" "$HOSTS_FILE" 2>/dev/null; then
-        rm -f "$TMP_HOSTS"
-        echo "无法写入 $HOSTS_FILE，请确认 /system 可写或指定 HOSTS_FILE" >&2
-        exit 1
-    fi
-
-    rm -f "$TMP_HOSTS"
-}
-
-restore_hosts() {
-    if [ -n "$HOSTS_BACKUP" ] && [ -f "$HOSTS_BACKUP" ]; then
-        remount_system_rw
-        cp "$HOSTS_BACKUP" "$HOSTS_FILE" 2>/dev/null || true
-        rm -f "$HOSTS_BACKUP"
-    fi
-    remount_system_ro
-}
-
 cleanup() {
     if [ -n "$SERVER_PID" ]; then
         kill "$SERVER_PID" 2>/dev/null || true
         wait "$SERVER_PID" 2>/dev/null || true
     fi
-    restore_hosts
 }
 
 need_root
-need_cmd sed
 ensure_binary
 install_android_ca
 configure_git
-backup_hosts
-apply_hosts
-
 trap cleanup EXIT INT TERM
 
-echo "=== 0proxy GitHub 透明代理 ==="
+echo "=== 0proxy ==="
 echo "监听端口: $PORT"
-echo "hosts 文件: $HOSTS_FILE"
-echo "代理域名:"
-for domain in $DOMAINS; do
-    echo "  $domain -> 127.0.0.1"
-done
 echo ""
-echo "浏览器访问 https://github.com 和 HTTPS git clone 会进入本地代理"
-echo "按 Ctrl-C 停止并恢复 hosts"
+echo "eBPF 已强制拦截 GitHub 流量，无需 hosts 配置"
+echo "按 Ctrl-C 退出"
 echo ""
 
 "$BIN" --port "$PORT" &
