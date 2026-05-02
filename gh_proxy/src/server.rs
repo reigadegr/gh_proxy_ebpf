@@ -25,6 +25,7 @@ async fn proxy_with_log(
 ) {
     info!("proxy: {} {}", req.method(), req.uri());
     Proxy::use_hyper_client("https://lgithub.xyz")
+        .host_header_getter(|_uri, _req, _depot| Some("github.com".to_string()))
         .handle(req, depot, res, ctrl)
         .await;
 }
