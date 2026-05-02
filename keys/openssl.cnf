@@ -1,0 +1,31 @@
+[req]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+CN = github.com
+
+[v3_ca]
+basicConstraints = critical,CA:TRUE
+keyUsage = critical,keyCertSign,cRLSign
+subjectKeyIdentifier = hash
+
+[v3_req]
+basicConstraints = CA:FALSE
+keyUsage = critical,digitalSignature,keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = github.com
+DNS.2 = www.github.com
+DNS.3 = gist.github.com
+DNS.4 = api.github.com
+DNS.5 = codeload.github.com
+DNS.6 = raw.githubusercontent.com
+DNS.7 = objects.githubusercontent.com
+DNS.8 = github-releases.githubusercontent.com
+DNS.9 = *.github.com
+DNS.10 = *.githubusercontent.com
+IP.1 = 127.0.0.1

@@ -8,7 +8,6 @@ workspace = true
 
 [dependencies]
 aya-ebpf = { git = "https://github.com/aya-rs/aya" }
-aya-log-ebpf = { git = "https://github.com/aya-rs/aya" }
 gh_proxy-common = { path = "../gh_proxy-common" }
 
 [[bin]]

@@ -2,7 +2,7 @@ use std::thread;
 
 use aya::programs::{SchedClassifier, TcAttachType, tc};
 use clap::Parser;
-use log::{error, info, warn};
+use log::{error, info};
 use tokio::signal;
 
 use gh_proxy::server;
@@ -50,11 +50,6 @@ async fn main() -> anyhow::Result<()> {
         env!("OUT_DIR"),
         "/gh_proxy"
     )))?;
-
-    // 初始化日志
-    if let Err(e) = aya_log::EbpfLogger::init(&mut ebpf) {
-        warn!("failed to initialize eBPF logger: {e}");
-    }
 
     // 添加 clsact qdisc（如果不存在）
     info!("Adding clsact qdisc to {}", opt.iface);

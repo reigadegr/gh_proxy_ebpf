@@ -17,7 +17,6 @@ workspace = true
 [dependencies]
 # eBPF 相关
 aya = { git = "https://github.com/aya-rs/aya" }
-aya-log = { git = "https://github.com/aya-rs/aya" }
 gh_proxy-common = { path = "../gh_proxy-common", features = ["user"] }
 
 # 通用依赖

@@ -2,7 +2,6 @@
 #![no_main]
 
 use aya_ebpf::{bindings::TC_ACT_OK, macros::classifier, programs::TcContext};
-use aya_log_ebpf::info;
 
 use core::mem;
 
@@ -93,11 +92,6 @@ fn try_egress(ctx: &TcContext) -> Result<i32, i64> {
 
     // 只处理目标是 GitHub 的 TCP 443 流量
     if dst_port == 443 && is_github_ip(dst_ip) {
-        info!(
-            ctx,
-            "Egress: GitHub {}:{} -> 127.0.0.1:{}", dst_ip, dst_port, LOCAL_PORT
-        );
-
         // 修改目标 IP 和端口
         unsafe {
             (*ipv4).daddr = u32::to_be(LOCAL_IP);
@@ -138,10 +132,7 @@ fn try_ingress(ctx: &TcContext) -> Result<i32, i64> {
     let src_ip = u32::from_be(unsafe { (*ipv4).saddr });
     let src_port = u16::from_be(unsafe { (*tcp).source });
 
-    // 来自本地代理的响应
-    if src_ip == LOCAL_IP && src_port == LOCAL_PORT {
-        info!(ctx, "Ingress: Response from local proxy");
-    }
+    // 来自本地代理的响应（日志已移除以兼容 Android 内核）
 
     Ok(TC_ACT_OK)
 }
@@ -171,25 +162,28 @@ unsafe fn ptr_at_mut<T>(ctx: &TcContext, offset: usize) -> Result<*mut T, i64> {
     Ok((start + offset) as *mut T)
 }
 
-// IP 校验和计算
+// IP 校验和计算（使用有界循环以通过 BPF 验证器）
 fn calculate_checksum(data: *const u8, len: usize) -> u16 {
     let mut sum: u32 = 0;
 
+    // BPF 验证器要求有界循环，IP 头最多 15 个 16-bit word
+    let words = len / 2;
     unsafe {
-        for i in 0..len / 2 {
-            let word = *((data as *const u16).add(i));
-            sum += u16::from_be(word) as u32;
-        }
-
-        if len % 2 == 1 {
-            let byte = *(data.add(len - 1));
-            sum += (byte as u32) << 8;
-        }
+        if words > 0 { sum += u16::from_be(*(data as *const u16).add(0)) as u32; }
+        if words > 1 { sum += u16::from_be(*(data as *const u16).add(1)) as u32; }
+        if words > 2 { sum += u16::from_be(*(data as *const u16).add(2)) as u32; }
+        if words > 3 { sum += u16::from_be(*(data as *const u16).add(3)) as u32; }
+        if words > 4 { sum += u16::from_be(*(data as *const u16).add(4)) as u32; }
+        if words > 5 { sum += u16::from_be(*(data as *const u16).add(5)) as u32; }
+        if words > 6 { sum += u16::from_be(*(data as *const u16).add(6)) as u32; }
+        if words > 7 { sum += u16::from_be(*(data as *const u16).add(7)) as u32; }
+        if words > 8 { sum += u16::from_be(*(data as *const u16).add(8)) as u32; }
+        if words > 9 { sum += u16::from_be(*(data as *const u16).add(9)) as u32; }
     }
 
-    while sum >> 16 != 0 {
-        sum = (sum & 0xFFFF) + (sum >> 16);
-    }
+    // 折叠进位（最多需要 2 次）
+    sum = (sum & 0xFFFF) + (sum >> 16);
+    sum = (sum & 0xFFFF) + (sum >> 16);
 
     !sum as u16
 }

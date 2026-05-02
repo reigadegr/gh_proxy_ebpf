@@ -4,7 +4,7 @@ set -e
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 TARGET="${RUST_TARGET:-aarch64-linux-android}"
 PORT="${PORT:-443}"
-BIN="$SCRIPT_DIR/target/$TARGET/debug/gh_proxy-server"
+BIN="$SCRIPT_DIR/target/$TARGET/debug/gh_proxy"
 CA_CERT="$SCRIPT_DIR/keys/ca.pem"
 SERVER_PID=""
 
@@ -95,13 +95,17 @@ install_android_ca
 configure_git
 trap cleanup EXIT INT TERM
 
+IFACE="${IFACE:-wlan0}"
+
 echo "=== 0proxy ==="
+echo "网络接口: $IFACE"
 echo "监听端口: $PORT"
 echo ""
 echo "eBPF 已强制拦截 GitHub 流量，无需 hosts 配置"
 echo "按 Ctrl-C 退出"
 echo ""
+killall -9 gh_proxy
 
-"$BIN" --port "$PORT" &
+"$BIN" --iface "$IFACE" --port "$PORT" &
 SERVER_PID="$!"
 wait "$SERVER_PID"
