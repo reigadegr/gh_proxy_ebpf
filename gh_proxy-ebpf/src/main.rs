@@ -2,6 +2,7 @@
 #![no_main]
 
 use aya_ebpf::{
+    bindings::BPF_F_INGRESS,
     bindings::TC_ACT_OK,
     helpers::bpf_redirect,
     macros::{classifier, map},
@@ -130,8 +131,8 @@ fn try_egress(ctx: &TcContext) -> Result<i32, i64> {
             (*tcp).check = 0;
         }
 
-        // 重定向到 loopback 接口
-        return Ok(unsafe { bpf_redirect(LO_IFINDEX, 0) } as i32);
+        // 重定向到 lo 的 ingress，让本地协议栈接收
+        return Ok(unsafe { bpf_redirect(LO_IFINDEX, (BPF_F_INGRESS as u32).into()) } as i32);
     }
 
     Ok(TC_ACT_OK)

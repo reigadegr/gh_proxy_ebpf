@@ -76,13 +76,14 @@ async fn main() -> anyhow::Result<()> {
         "/gh_proxy"
     )))?;
 
-    // 添加 clsact qdisc（如果不存在）
-    info!("Adding clsact qdisc to {}", opt.iface);
-    let _ = tc::qdisc_add_clsact(&opt.iface);
-
-    // 添加 clsact qdisc 到 lo
-    info!("Adding clsact qdisc to lo");
-    let _ = tc::qdisc_add_clsact("lo");
+    match tc::qdisc_add_clsact(&opt.iface) {
+        Ok(()) => info!("clsact added to {}", opt.iface),
+        Err(e) => error!("Failed to add clsact to {}: {e}", opt.iface),
+    }
+    match tc::qdisc_add_clsact("lo") {
+        Ok(()) => info!("clsact added to lo"),
+        Err(e) => error!("Failed to add clsact to lo: {e}", opt.iface),
+    }
 
     // 加载并附加出站 TC 程序到 wlan0
     #[allow(clippy::expect_used)]
