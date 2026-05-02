@@ -10,6 +10,6 @@ export RUSTFLAGS="
 "
 
 cargo fmt --all
-# 运行 clippy
-cargo clippy --workspace --all --all-targets --all-features --no-deps
-cargo test --workspace
+# 运行 clippy（排除 eBPF 包，因为它是 no_std 目标）
+cargo clippy --workspace --exclude gh_proxy-ebpf --all --all-targets --all-features --no-deps
+cargo test --workspace --exclude gh_proxy-ebpf

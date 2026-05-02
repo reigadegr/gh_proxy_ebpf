@@ -2,6 +2,7 @@ use log::info;
 use mimalloc::MiMalloc;
 use salvo::conn::rustls::{Keycert, RustlsConfig};
 use salvo::prelude::*;
+use salvo::proxy::Proxy;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -13,6 +14,19 @@ async fn redirect_to_gh_proxy(req: &mut Request, res: &mut Response) {
         "https://gh-proxy.com/{}",
         req.uri()
     )));
+}
+
+#[handler]
+async fn proxy_with_log(
+    req: &mut Request,
+    depot: &mut Depot,
+    res: &mut Response,
+    ctrl: &mut FlowCtrl,
+) {
+    info!("proxy: {} {}", req.method(), req.uri());
+    Proxy::use_hyper_client("https://lgithub.xyz")
+        .handle(req, depot, res, ctrl)
+        .await;
 }
 
 pub async fn run_server(port: u16) -> anyhow::Result<()> {
@@ -28,15 +42,15 @@ pub async fn run_server(port: u16) -> anyhow::Result<()> {
             Router::with_path("/{user}/{repo}/releases/download/{**rest}")
                 .goal(redirect_to_gh_proxy),
         )
-        .push(Router::with_path("{**rest}").goal(Proxy::use_hyper_client("https://lgithub.xyz")));
+        .push(Router::with_path("{**rest}").goal(proxy_with_log));
 
     // 启动服务器
-    let acceptor = TcpListener::new(format!("0.0.0.0:{}", port))
+    let acceptor = TcpListener::new(format!("0.0.0.0:{port}"))
         .rustls(tls_config)
         .bind()
         .await;
 
-    info!("Server listening on 0.0.0.0:{}", port);
+    info!("Server listening on 0.0.0.0:{port}");
 
     Server::new(acceptor).serve(router).await;
 

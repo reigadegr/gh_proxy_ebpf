@@ -13,6 +13,9 @@ gh_proxy-common = { path = "../gh_proxy-common" }
 [[bin]]
 name = "gh_proxy"
 path = "src/main.rs"
+test = false
+doctest = false
+bench = false
 
 [build-dependencies]
 aya-build = { git = "https://github.com/aya-rs/aya" }

@@ -54,10 +54,12 @@ async fn main() -> anyhow::Result<()> {
     // 启动 salvo 服务器线程
     let server_port = opt.port;
     let _server_handle = thread::spawn(move || {
-        let rt = tokio::runtime::Runtime::new().unwrap();
+        // SAFETY: tokio runtime creation should not fail in normal circumstances
+        #[allow(clippy::expect_used)]
+        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
         rt.block_on(async {
             if let Err(e) = server::run_server(server_port).await {
-                error!("Server error: {}", e);
+                error!("Server error: {e}");
             }
         });
     });
@@ -78,19 +80,29 @@ async fn main() -> anyhow::Result<()> {
     info!("Adding clsact qdisc to {}", opt.iface);
     let _ = tc::qdisc_add_clsact(&opt.iface);
 
-    // 加载并附加出站 TC 程序
-    let egress_prog: &mut SchedClassifier =
-        ebpf.program_mut("gh_proxy_egress").unwrap().try_into()?;
+    // 添加 clsact qdisc 到 lo
+    info!("Adding clsact qdisc to lo");
+    let _ = tc::qdisc_add_clsact("lo");
+
+    // 加载并附加出站 TC 程序到 wlan0
+    #[allow(clippy::expect_used)]
+    let egress_prog: &mut SchedClassifier = ebpf
+        .program_mut("gh_proxy_egress")
+        .expect("gh_proxy_egress program not found")
+        .try_into()?;
     egress_prog.load()?;
     egress_prog.attach(&opt.iface, TcAttachType::Egress)?;
     info!("Attached egress TC program to {}", opt.iface);
 
-    // 加载并附加入站 TC 程序
-    let ingress_prog: &mut SchedClassifier =
-        ebpf.program_mut("gh_proxy_ingress").unwrap().try_into()?;
-    ingress_prog.load()?;
-    ingress_prog.attach(&opt.iface, TcAttachType::Ingress)?;
-    info!("Attached ingress TC program to {}", opt.iface);
+    // 加载并附加 lo 出站 TC 程序（用于翻译响应源地址）
+    #[allow(clippy::expect_used)]
+    let lo_egress_prog: &mut SchedClassifier = ebpf
+        .program_mut("gh_proxy_lo_egress")
+        .expect("gh_proxy_lo_egress program not found")
+        .try_into()?;
+    lo_egress_prog.load()?;
+    lo_egress_prog.attach("lo", TcAttachType::Egress)?;
+    info!("Attached lo egress TC program to lo");
 
     info!("");
     info!("=== 系统就绪 ===");
@@ -109,7 +121,7 @@ async fn main() -> anyhow::Result<()> {
 
     // 清理 TC 规则
     let _ = tc::qdisc_detach_program(&opt.iface, TcAttachType::Egress, "gh_proxy_egress");
-    let _ = tc::qdisc_detach_program(&opt.iface, TcAttachType::Ingress, "gh_proxy_ingress");
+    let _ = tc::qdisc_detach_program("lo", TcAttachType::Egress, "gh_proxy_lo_egress");
 
     Ok(())
 }

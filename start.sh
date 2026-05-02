@@ -106,4 +106,5 @@ echo "按 Ctrl-C 退出"
 echo ""
 killall -9 gh_proxy || true
 "$BIN" --iface "$IFACE" --port "$PORT" &
+SERVER_PID=$!
 wait "$SERVER_PID"

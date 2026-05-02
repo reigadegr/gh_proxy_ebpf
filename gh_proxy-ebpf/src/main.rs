@@ -1,23 +1,27 @@
 #![no_std]
 #![no_main]
 
-use aya_ebpf::{bindings::TC_ACT_OK, macros::classifier, programs::TcContext};
+use aya_ebpf::{
+    bindings::TC_ACT_OK,
+    helpers::bpf_redirect,
+    macros::{classifier, map},
+    maps::LruHashMap,
+    programs::TcContext,
+};
 
-use core::mem;
+use core::{mem, panic::PanicInfo};
 
 /// GitHub.com 的 IP 地址范围（需要根据实际情况更新）
 const GITHUB_IPS: [(u32, u32); 4] = [
-    (0x141C7000, 0xFFFFFF00), // 20.28.112.0/24
-    (0x14CDF300, 0xFFFFFF00), // 20.205.243.0/24
-    (0x8C520000, 0xFFFFF000), // 140.82.112.0/20
-    (0xC01EFC00, 0xFFFFFC00), // 192.30.252.0/22
+    (0x141C_7000, 0xFFFF_FF00), // 20.28.112.0/24
+    (0x14CD_F300, 0xFFFF_FF00), // 20.205.243.0/24
+    (0x8C52_0000, 0xFFFF_F000), // 140.82.112.0/20
+    (0xC01E_FC00, 0xFFFF_FC00), // 192.30.252.0/22
 ];
 
-/// 本地代理 IP
-const LOCAL_IP: u32 = 0x7F000001; // 127.0.0.1
-
-/// 本地代理端口
+const LOCAL_IP: u32 = 0x7F00_0001; // 127.0.0.1
 const LOCAL_PORT: u16 = 443;
+const LO_IFINDEX: u32 = 1;
 
 // 网络包头结构
 #[repr(C)]
@@ -54,7 +58,16 @@ struct TcpHdr {
     urg_ptr: u16,
 }
 
-/// 出站流量处理（本地 -> GitHub）
+/// 连接映射表：key = (client_ip << 16 | client_port), value = 原始目标 GitHub IP
+#[map]
+static CONNECTIONS: LruHashMap<u64, u32> = LruHashMap::with_max_entries(4096, 0);
+
+#[inline(always)]
+fn make_key(ip: u32, port: u16) -> u64 {
+    ((ip as u64) << 16) | (port as u64)
+}
+
+/// 出站流量处理（wlan0 出站：拦截 GitHub 请求并重定向到 lo）
 #[classifier]
 pub fn gh_proxy_egress(ctx: TcContext) -> i32 {
     match try_egress(&ctx) {
@@ -63,10 +76,10 @@ pub fn gh_proxy_egress(ctx: TcContext) -> i32 {
     }
 }
 
-/// 入站流量处理（GitHub -> 本地）
+/// lo 出站流量处理（lo 出站：翻译服务器响应的源地址）
 #[classifier]
-pub fn gh_proxy_ingress(ctx: TcContext) -> i32 {
-    match try_ingress(&ctx) {
+pub fn gh_proxy_lo_egress(ctx: TcContext) -> i32 {
+    match try_lo_egress(&ctx) {
         Ok(ret) => ret,
         Err(_) => TC_ACT_OK,
     }
@@ -90,10 +103,17 @@ fn try_egress(ctx: &TcContext) -> Result<i32, i64> {
 
     let dst_ip = u32::from_be(unsafe { (*ipv4).daddr });
     let dst_port = u16::from_be(unsafe { (*tcp).dest });
+    let src_ip = u32::from_be(unsafe { (*ipv4).saddr });
+    let src_port = u16::from_be(unsafe { (*tcp).source });
 
     // 只处理目标是 GitHub 的 TCP 443 流量
     if dst_port == 443 && is_github_ip(dst_ip) {
-        // 修改目标 IP 和端口
+        // 记录连接映射：(客户端 IP, 客户端端口) -> 原始目标 IP
+        let key = make_key(src_ip, src_port);
+
+        let _ = CONNECTIONS.insert(&key, &dst_ip, 0);
+
+        // 修改目标地址为本地代理
         unsafe {
             (*ipv4).daddr = u32::to_be(LOCAL_IP);
             (*tcp).dest = u16::to_be(LOCAL_PORT);
@@ -105,16 +125,20 @@ fn try_egress(ctx: &TcContext) -> Result<i32, i64> {
             (*ipv4).check = calculate_checksum(ipv4 as *const _ as *const u8, 20);
         }
 
-        // TCP 校验和需要重新计算（简化处理，设为 0）
+        // TCP 校验和：loopback 接口跳过校验
         unsafe {
             (*tcp).check = 0;
         }
+
+        // 重定向到 loopback 接口
+        return Ok(unsafe { bpf_redirect(LO_IFINDEX, 0) } as i32);
     }
 
     Ok(TC_ACT_OK)
 }
 
-fn try_ingress(ctx: &TcContext) -> Result<i32, i64> {
+/// lo 出站处理：服务器响应的源地址从 127.0.0.1 翻译回原始 GitHub IP
+fn try_lo_egress(ctx: &TcContext) -> Result<i32, i64> {
     let eth = unsafe { ptr_at_mut::<EthHdr>(ctx, 0)? };
 
     if u16::from_be(unsafe { (*eth).ethertype }) != 0x0800 {
@@ -132,8 +156,29 @@ fn try_ingress(ctx: &TcContext) -> Result<i32, i64> {
 
     let src_ip = u32::from_be(unsafe { (*ipv4).saddr });
     let src_port = u16::from_be(unsafe { (*tcp).source });
+    let dst_ip = u32::from_be(unsafe { (*ipv4).daddr });
+    let dst_port = u16::from_be(unsafe { (*tcp).dest });
 
-    // 来自本地代理的响应（日志已移除以兼容 Android 内核）
+    // 来自本地代理的响应（src=127.0.0.1:443）
+    if src_port == 443 && src_ip == LOCAL_IP {
+        let key = make_key(dst_ip, dst_port);
+        if let Some(original_ip) = unsafe { CONNECTIONS.get(&key) } {
+            let original_ip = *original_ip;
+            // 将源地址从 127.0.0.1 翻译回原始 GitHub IP
+            unsafe {
+                (*ipv4).saddr = u32::to_be(original_ip);
+            }
+            // 重新计算 IP 校验和
+            unsafe {
+                (*ipv4).check = 0;
+                (*ipv4).check = calculate_checksum(ipv4 as *const _ as *const u8, 20);
+            }
+            // TCP 校验和：loopback 接口跳过校验
+            unsafe {
+                (*tcp).check = 0;
+            }
+        }
+    }
 
     Ok(TC_ACT_OK)
 }
@@ -210,6 +255,6 @@ fn calculate_checksum(data: *const u8, len: usize) -> u16 {
 }
 
 #[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
-    unsafe { core::hint::unreachable_unchecked() }
+fn panic(_info: &PanicInfo) -> ! {
+    loop {}
 }
