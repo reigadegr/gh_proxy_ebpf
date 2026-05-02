@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 
+use aya_ebpf::helpers::bpf_printk;
 use aya_ebpf::{
     bindings::BPF_F_INGRESS,
     bindings::TC_ACT_OK,
@@ -80,6 +81,10 @@ pub fn gh_proxy_egress(ctx: TcContext) -> i32 {
 /// lo 出站流量处理（lo 出站：翻译服务器响应的源地址）
 #[classifier]
 pub fn gh_proxy_lo_egress(ctx: TcContext) -> i32 {
+    unsafe {
+        bpf_printk!(c"gh_proxy_lo_egress triggered");
+    }
+
     match try_lo_egress(&ctx) {
         Ok(ret) => ret,
         Err(_) => TC_ACT_OK,
@@ -87,6 +92,10 @@ pub fn gh_proxy_lo_egress(ctx: TcContext) -> i32 {
 }
 
 fn try_egress(ctx: &TcContext) -> Result<i32, i64> {
+    unsafe {
+        bpf_printk!(c"gh_proxy_egress triggered");
+    }
+
     let eth = unsafe { ptr_at_mut::<EthHdr>(ctx, 0)? };
 
     if u16::from_be(unsafe { (*eth).ethertype }) != 0x0800 {
