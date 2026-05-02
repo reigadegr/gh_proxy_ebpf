@@ -3,5 +3,8 @@ name = "gh_proxy-common"
 version = "0.1.0"
 edition = "2024"
 
+[lints]
+workspace = true
+
 [dependencies]
 aya = { git = "https://github.com/aya-rs/aya" }

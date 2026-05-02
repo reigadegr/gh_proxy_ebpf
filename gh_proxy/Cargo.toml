@@ -11,6 +11,9 @@ path = "src/main.rs"
 name = "gh_proxy-server"
 path = "src/server_bin.rs"
 
+[lints]
+workspace = true
+
 [dependencies]
 # eBPF 相关
 aya = { git = "https://github.com/aya-rs/aya", features = ["async_tokio"] }
